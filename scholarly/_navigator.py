@@ -217,7 +217,8 @@ class Navigator(object, metaclass=Singleton):
             rows = soup.find_all('div', 'gsc_1usr')
             self.logger.info("Found %d authors", len(rows))
             for row in rows:
-                yield author_parser.get_author(row), url
+                yield author_parser.get_author(row)
+                yield url
             cls1 = 'gs_btnPR gs_in_ib gs_btn_half '
             cls2 = 'gs_btn_lsb gs_btn_srt gsc_pgn_pnx'
             next_button = soup.find(class_=cls1 + cls2)  # Can be improved
