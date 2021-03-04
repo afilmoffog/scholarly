@@ -31,11 +31,14 @@ from .author_parser import AuthorParser
 from .publication_parser import PublicationParser
 from .data_types import Author, PublicationSource
 
+
 class DOSException(Exception):
     """DOS attack was detected."""
 
+
 class MaxTriesExceededException(Exception):
     pass
+
 
 class Singleton(type):
     _instances = {}
@@ -61,7 +64,6 @@ class Navigator(object, metaclass=Singleton):
         self._session = self.pm.get_session()
         self.got_403 = False
 
-
     def set_logger(self, enable: bool):
         """Enable or disable the logger for google scholar."""
 
@@ -83,10 +85,8 @@ class Navigator(object, metaclass=Singleton):
         self.got_403 = False
         self._session = self.pm._new_session()
 
-    
     def _get_page(self, pagerequest: str) -> str:
         """Return the data from a webpage
-
         :param pagerequest: the page url
         :type pagerequest: str
         :returns: the text from a webpage
@@ -96,10 +96,10 @@ class Navigator(object, metaclass=Singleton):
         self.logger.info("Getting %s", pagerequest)
         resp = None
         tries = 0
-        timeout=self._TIMEOUT
+        timeout = self._TIMEOUT
         while tries < self._max_retries:
             try:
-                w = random.uniform(1,2)
+                w = random.uniform(1, 2)
                 time.sleep(w)
                 resp = self._session.get(pagerequest, timeout=timeout)
                 self.logger.info("Session proxy config is {}".format(self._session.proxies))
@@ -111,7 +111,7 @@ class Navigator(object, metaclass=Singleton):
                 elif has_captcha:
                     self.logger.info("Got a captcha request.")
                     self._session = self.pm._handle_captcha2(pagerequest)
-                    continue # Retry request within same session
+                    continue  # Retry request within same session
                 elif resp.status_code == 403:
                     self.logger.info(f"Got an access denied error (403).")
                     if not self.pm.has_proxy():
@@ -120,13 +120,13 @@ class Navigator(object, metaclass=Singleton):
                             self.logger.info("Retrying immediately with another session.")
                         else:
                             if not self.pm._use_luminati:
-                                w = random.uniform(60, 2*60)
+                                w = random.uniform(60, 2 * 60)
                                 self.logger.info("Will retry after {} seconds (with another session).".format(w))
                                 time.sleep(w)
                         self._new_session()
                         self.got_403 = True
-                        
-                        continue # Retry request within same session
+
+                        continue  # Retry request within same session
                     else:
                         self.logger.info("We can use another connection... let's try that.")
                 else:
@@ -136,14 +136,14 @@ class Navigator(object, metaclass=Singleton):
             except DOSException:
                 if not self.pm.has_proxy():
                     self.logger.info("No other connections possible.")
-                    w = random.uniform(60, 2*60)
+                    w = random.uniform(60, 2 * 60)
                     self.logger.info("Will retry after {} seconds (with the same session).".format(w))
                     time.sleep(w)
                     continue
             except Timeout as e:
                 err = f"Timeout Exception %s while fetching page: %s" % (type(e).__name__, e.args)
                 self.logger.info(err)
-                if timeout < 3*self._TIMEOUT:
+                if timeout < 3 * self._TIMEOUT:
                     self.logger.info("Increasing timeout and retrying within same session.")
                     timeout = timeout + self._TIMEOUT
                     continue
@@ -154,45 +154,41 @@ class Navigator(object, metaclass=Singleton):
                 self.logger.info("Retrying with a new session.")
 
             tries += 1
-            self._session, timeout = self.pm.get_next_proxy(num_tries = tries, old_timeout = timeout)
+            self._session, timeout = self.pm.get_next_proxy(num_tries=tries, old_timeout=timeout)
         raise MaxTriesExceededException("Cannot Fetch from Google Scholar.")
-
 
     def _set_retries(self, num_retries: int) -> None:
         if (num_retries < 0):
             raise ValueError("num_retries must not be negative")
         self._max_retries = num_retries
 
-
     def _requests_has_captcha(self, text) -> bool:
         """Tests whether some html text contains a captcha.
-
         :param text: the webpage text
         :type text: str
         :returns: whether or not the site contains a captcha
         :rtype: {bool}
         """
         return self._has_captcha(
-            lambda i : f'id="{i}"' in text,
-            lambda c : f'class="{c}"' in text,
+            lambda i: f'id="{i}"' in text,
+            lambda c: f'class="{c}"' in text,
         )
 
     def _webdriver_has_captcha(self) -> bool:
         """Tests whether the current webdriver page contains a captcha.
-
         :returns: whether or not the site contains a captcha
         :rtype: {bool}
         """
         return self._has_captcha(
-            lambda i : len(self.pm._get_webdriver().find_elements(By.ID, i)) > 0,
-            lambda c : len(self.pm._get_webdriver().find_elements(By.CLASS_NAME, c)) > 0,
+            lambda i: len(self.pm._get_webdriver().find_elements(By.ID, i)) > 0,
+            lambda c: len(self.pm._get_webdriver().find_elements(By.CLASS_NAME, c)) > 0,
         )
 
     def _has_captcha(self, got_id, got_class) -> bool:
         _CAPTCHA_IDS = [
-            "gs_captcha_ccl", # the normal captcha div
-            "recaptcha", # the form used on full-page captchas
-            "captcha-form", # another form used on full-page captchas
+            "gs_captcha_ccl",  # the normal captcha div
+            "recaptcha",  # the form used on full-page captchas
+            "captcha-form",  # another form used on full-page captchas
         ]
         _DOS_CLASSES = [
             "rc-doscaptcha-body",
@@ -212,19 +208,19 @@ class Navigator(object, metaclass=Singleton):
             pass
         return res
 
-    def search_authors(self, url: str)->Author:
+    def search_authors(self, url: str) -> Author:
         """Generator that returns Author objects from the author search page"""
         soup = self._get_soup(url)
-         
+
         author_parser = AuthorParser(self)
         while True:
             rows = soup.find_all('div', 'gsc_1usr')
             self.logger.info("Found %d authors", len(rows))
             for row in rows:
-                yield author_parser.get_author(row)
+                yield author_parser.get_author(row), url
             cls1 = 'gs_btnPR gs_in_ib gs_btn_half '
             cls2 = 'gs_btn_lsb gs_btn_srt gsc_pgn_pnx'
-            next_button = soup.find(class_=cls1+cls2)  # Can be improved
+            next_button = soup.find(class_=cls1 + cls2)  # Can be improved
             if next_button and 'disabled' not in next_button.attrs:
                 self.logger.info("Loading next page of authors")
                 url = next_button['onclick'][17:-1]
@@ -237,7 +233,6 @@ class Navigator(object, metaclass=Singleton):
     def search_publication(self, url: str,
                            filled: bool = False) -> PublicationParser:
         """Search by scholar query and return a single Publication object
-
         :param url: the url to be searched at
         :type url: str
         :param filled: Whether publication should be filled, defaults to False
@@ -247,14 +242,14 @@ class Navigator(object, metaclass=Singleton):
         """
         soup = self._get_soup(url)
         publication_parser = PublicationParser(self)
-        pub = publication_parser.get_publication(soup.find_all('div', 'gs_or')[0], PublicationSource.PUBLICATION_SEARCH_SNIPPET)
+        pub = publication_parser.get_publication(soup.find_all('div', 'gs_or')[0],
+                                                 PublicationSource.PUBLICATION_SEARCH_SNIPPET)
         if filled:
             pub = publication_parser.fill(pub)
         return pub
 
     def search_publications(self, url: str) -> _SearchScholarIterator:
         """Returns a Publication Generator given a url
-
         :param url: the url where publications can be found.
         :type url: str
         :returns: An iterator of Publications
@@ -262,7 +257,8 @@ class Navigator(object, metaclass=Singleton):
         """
         return _SearchScholarIterator(self, url)
 
-    def search_author_id(self, id: str, filled: bool = False, sortby: str = "citedby", publication_limit: int = 0) -> Author:
+    def search_author_id(self, id: str, filled: bool = False, sortby: str = "citedby",
+                         publication_limit: int = 0) -> Author:
         """Search by author ID and return a Author object
         :param id: the Google Scholar id of a particular author
         :type url: str
